@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>원판 룰렛 - 랜덤 돌림판</title>
+<style>
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'Roboto', Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  h1 { margin-bottom: 20px; font-weight: 400; color: #202124; }
+  #rouletteCanvas {
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  #arrow {
+    width: 0; height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-bottom: 30px solid #d93025;
+    margin: 15px 0;
+  }
+  .buttons { display: flex; gap: 12px; margin-top: 12px; }
+  button {
+    padding: 10px 24px; font-size: 16px; cursor: pointer;
+    border: none; border-radius: 6px;
+    background: #1a73e8; color: #fff; font-weight: 500;
+    transition: 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  button:hover { background: #1669c1; }
+  #resetBtn { background: #fbbc05; } #resetBtn:hover { background: #e2a700; }
+  #result { margin-top: 15px; font-size: 20px; font-weight: 500; color: #d93025; }
+  #addItemBtn {
+    margin-top: 20px; padding: 10px 24px; font-size: 16px; font-weight: 500;
+    color: #202124; background: #ffffff; border: 1px solid #dadce0;
+    border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  #addItemBtn:hover { background: #f1f3f4; }
+  #itemManager {
+    margin-top: 20px; padding: 12px; border-radius: 12px; background: #fff;
+    width: 420px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .item-row input[type="text"] { flex: 1; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; }
+  .item-row button { padding: 6px 12px; font-size: 13px; background: #ea4335; color: #fff; border-radius: 6px; border: none; }
+  .item-row button:hover { background: #c5221f; }
+  #settingsBtn {
+    margin-top: 15px; cursor: pointer; font-size: 16px; color: #fff;
+    background: #5f6368; border: none; border-radius: 6px;
+    padding: 8px 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: 0.2s;
+  }
+  #settingsBtn:hover { background: #3c4043; }
+  #weightManager {
+    display: none; margin-top: 10px; padding: 12px; border-radius: 10px;
+    background: #fff; width: 420px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .weight-row {
+    display: grid; grid-template-columns: 150px 1fr 60px;
+    align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  input[type="range"] { width: 100%; }
+  .weight-row input[type="number"] {
+    width: 60px; padding: 4px 6px; border: 1px solid #dadce0; border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>원판 룰렛</h1>
+<canvas id="rouletteCanvas" width="400" height="400"></canvas>
+<div id="arrow"></div>
+<div class="buttons">
+  <button id="spinBtn">돌리기!</button>
+  <button id="resetBtn">리셋</button>
+</div>
+<div id="result"></div>
+<div id="itemManager"></div>
+<button id="addItemBtn">항목 추가</button>
+<button id="settingsBtn">광고 문의</button>
+<div id="weightManager"></div>
+
+<script>
+const canvas = document.getElementById("rouletteCanvas");
+const ctx = canvas.getContext("2d");
+const spinBtn = document.getElementById("spinBtn");
+const resetBtn = document.getElementById("resetBtn");
+const resultDiv = document.getElementById("result");
+const addItemBtn = document.getElementById("addItemBtn");
+const itemManager = document.getElementById("itemManager");
+const settingsBtn = document.getElementById("settingsBtn");
+const weightManager = document.getElementById("weightManager");
+
+let segments = [
+  {name: "100점", color: "#f39c12", weight: 1},
+  {name: "200점", color: "#e74c3c", weight: 1},
+  {name: "꽝", color: "#2ecc71", weight: 1},
+  {name: "500점", color: "#3498db", weight: 1},
+  {name: "300점", color: "#9b59b6", weight: 1},
+  {name: "꽝", color: "#1abc9c", weight: 1}
+];
+
+let currentAngle = 0;
+let spinning = false;
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+const radius = canvas.width / 2 - 10;
+
+function randomColor() {
+  const letters = '0123456789ABCDEF';
+  let color;
+  do {
+    color = '#';
+    for (let i = 0; i < 6; i++) color += letters[Math.floor(Math.random() * 16)];
+  } while (segments.some(seg => seg.color.toLowerCase() === color.toLowerCase()));
+  return color;
+}
+
+function drawRoulette() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const segmentCount = segments.length;
+  const anglePerSegment = (2 * Math.PI) / segmentCount;
+
+  for (let i = 0; i < segmentCount; i++) {
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, i * anglePerSegment + currentAngle, (i + 1) * anglePerSegment + currentAngle);
+    ctx.fillStyle = segments[i].color;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(i * anglePerSegment + anglePerSegment / 2 + currentAngle);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.font = "16px Arial";
+    ctx.fillText(segments[i].name, radius - 10, 5);
+    ctx.restore();
+  }
+}
+
+function weightedRandom() {
+  const totalWeight = segments.reduce((sum, seg) => sum + seg.weight, 0);
+  let rand = Math.random() * totalWeight;
+  for (let i = 0; i < segments.length; i++) {
+    if (rand < segments[i].weight) return i;
+    rand -= segments[i].weight;
+  }
+  return segments.length - 1;
+}
+
+function spinRoulette() {
+  if (spinning) return;
+  spinning = true;
+  resultDiv.textContent = "";
+
+  const winningIndex = weightedRandom();
+  const segmentCount = segments.length;
+  const anglePerSegment = (2 * Math.PI) / segmentCount;
+
+  // 🔹 각 항목 내 랜덤 오차 추가 (항목의 ±40% 범위)
+  const randomOffset = (Math.random() - 0.5) * anglePerSegment * 0.8;
+
+  const targetAngle = (Math.PI / 2) - (winningIndex * anglePerSegment) - anglePerSegment / 2 + randomOffset;
+  const spins = 5;
+  const finalAngle = spins * 2 * Math.PI + targetAngle;
+  const duration = 4000;
+
+  let start = null;
+  function animate(timestamp) {
+    if (!start) start = timestamp;
+    let progress = timestamp - start;
+    let t = Math.min(progress / duration, 1);
+    let easeOut = 1 - Math.pow(1 - t, 3);
+    currentAngle = finalAngle * easeOut;
+    drawRoulette();
+    if (t < 1) requestAnimationFrame(animate);
+    else {
+      spinning = false;
+      resultDiv.textContent = "당첨: " + segments[winningIndex].name;
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function updateItemManager() {
+  itemManager.innerHTML = "";
+  segments.forEach((seg, index) => {
+    const div = document.createElement("div");
+    div.className = "item-row";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = seg.name;
+    nameInput.addEventListener("input", () => {
+      seg.name = nameInput.value;
+      drawRoulette();
+      updateWeightManager();
+    });
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "삭제";
+    deleteBtn.addEventListener("click", () => {
+      segments.splice(index, 1);
+      updateItemManager();
+      updateWeightManager();
+      drawRoulette();
+    });
+    div.appendChild(nameInput);
+    div.appendChild(deleteBtn);
+    itemManager.appendChild(div);
+  });
+}
+
+function updateWeightManager() {
+  weightManager.innerHTML = "";
+  segments.forEach((seg, index) => {
+    const div = document.createElement("div");
+    div.className = "weight-row";
+    const label = document.createElement("span");
+    label.textContent = seg.name;
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = 0; slider.max = 100; slider.value = seg.weight;
+    const numberInput = document.createElement("input");
+    numberInput.type = "number"; numberInput.min = 0; numberInput.max = 100; numberInput.value = seg.weight;
+    slider.addEventListener("input", () => {
+      seg.weight = parseFloat(slider.value); numberInput.value = slider.value;
+    });
+    numberInput.addEventListener("input", () => {
+      let val = parseFloat(numberInput.value);
+      if (isNaN(val)) val = 0;
+      val = Math.max(0, Math.min(100, val));
+      seg.weight = val;
+      slider.value = val;
+    });
+    div.appendChild(label);
+    div.appendChild(slider);
+    div.appendChild(numberInput);
+    weightManager.appendChild(div);
+  });
+}
+
+addItemBtn.addEventListener("click", () => {
+  segments.push({name: "새 항목", color: randomColor(), weight: 1});
+  updateItemManager();
+  updateWeightManager();
+  drawRoulette();
+});
+resetBtn.addEventListener("click", () => {
+  segments.forEach(seg => seg.weight = 1);
+  updateWeightManager();
+});
+settingsBtn.addEventListener("click", () => {
+  weightManager.style.display = weightManager.style.display === "none" ? "block" : "none";
+});
+
+drawRoulette();
+updateItemManager();
+updateWeightManager();
+spinBtn.addEventListener("click", spinRoulette);
+</script>
+</body>
+</html>
